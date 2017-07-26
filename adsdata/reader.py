@@ -1,11 +1,20 @@
 
+from adsputils import setup_logging, load_config
+
 
 
 class ADSClassicInputStream(object):
 
     def __init__(self, file_):
         self._file = file_
+        self.read_count = 0   # needed for logging
+        self.logger = setup_logging('AdsDataSqlSync', 'DEBUG')
+        self.logger.info('nonbib file ingest, file {}'.format(self._file))
+        self.config = {}
+        self.config.update(load_config())
+
         self._iostream = open(file_, 'r')
+        
         
 
     def __enter__(self, *args, **kwargs):
@@ -30,13 +39,19 @@ class ADSClassicInputStream(object):
 
 
     def read(self, size=-1):
+        self.read_count += 1
+        if self.read_count % 100000 == 0:
+            self.logger.debug('nonbib file ingest, count = {}'.format(self.read_count))
+            
         line = self._iostream.readline()
-        if len(line) == 0:
+        if len(line) == 0 or (self.config['MAX_ROWS'] > 0 and self.read_count > self.config['MAX_ROWS']):
+            self.logger.info('nonbib file ingest, processed {}, contained {} lines'.format(self._file, self.read_count))
             return ''
         return self.process_line(line)
     
 
     def readline(self):
+        self.read_count += 1
         line = self._iostream.readline()
         return self.process_line(line)
     
@@ -50,12 +65,11 @@ class BibcodeFileReader(ADSClassicInputStream):
     
     def __init__(self, file_):
         super(BibcodeFileReader, self).__init__(file_)
-        self.counter = 1
+
         
     def process_line(self, line):
         bibcode = line[:-1]
-        row = '{}\t{}\n'.format(bibcode, self.counter)
-        self.counter += 1
+        row = '{}\t{}\n'.format(bibcode, self.read_count)
         return row
     
  
@@ -73,6 +87,7 @@ class StandardFileReader(ADSClassicInputStream):
     def __init__(self, file_type_, file_):
         super(StandardFileReader, self).__init__(file_)
         self.file_type = file_type_
+        
         # the following lists controls how they are processed
         # as_array: should values be read in as an array and output to sql as an array
         #  for example, downloads and grants are an array while relevance has several distinct values but isn't an array
@@ -84,8 +99,12 @@ class StandardFileReader(ADSClassicInputStream):
         self.tab_separated_values = ('author', 'download', 'reads')
         
     def read(self, size=-1):
+        self.read_count += 1
+        if self.read_count % 100000 == 0:
+            self.logger.debug('nonbib file ingest, processing {}, count = {}'.format(self.file_type, self.read_count))
         line = self._iostream.readline()
-        if len(line) == 0:
+        if len(line) == 0  or (self.config['MAX_ROWS'] > 0 and self.read_count > self.config['MAX_ROWS']):
+            self.logger.info('nonbib bile ingest, processed {}, contained {} lines'.format(self._file, self.read_count))
             return ''
         # does the next line match the current bibcode?
         bibcode = line[:19]
@@ -102,8 +121,9 @@ class StandardFileReader(ADSClassicInputStream):
     
 
     def readline(self):
-        line = self._iostream.readline()
-        return self.process_line(line)
+        return self.read()
+        #line = self._iostream.readline()
+        #return self.process_line(line)
 
         
     def process_line(self, bibcode, value):

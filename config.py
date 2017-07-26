@@ -20,6 +20,7 @@ AUTHOR = 'facet_authors/all.links'
 #AUTHOR = 'authors/all.links'
 REFERENCE = 'reference/all.links'
 SIMBAD = 'simbad/simbad_objects.tab'
+NED = 'ned/ned_objects.tab' 
 GRANTS = 'grants/all.links'
 CITATION = 'citation/all.links'
 READER = 'alsoread_bib/all.links'
@@ -31,10 +32,6 @@ CANONICAL = 'bibcodes.list.can'
 # -1 means process all rows
 MAX_ROWS = -1
 
-#RABBITMQ_URL = 'amqp://user:pass@host:5682/etl'
-#RABBITMQ_EXCHANGE = 'MergerPipelineExchange'
-#RABBITMQ_ROUTE = 'SolrUpdateQueue'
-
 
 # ================= celery/rabbitmq rules============== #
 # ##################################################### #
@@ -43,23 +40,13 @@ ACKS_LATE=True
 PREFETCH_MULTIPLIER=1
 CELERYD_TASK_SOFT_TIME_LIMIT = 60
 
-CELERY_DEFAULT_EXCHANGE = 'import-pipeline'
+CELERY_DEFAULT_EXCHANGE = 'ads-data'
 CELERY_DEFAULT_EXCHANGE_TYPE = "topic"
 
-METRICS_READ_CONNECTION = 'postgresql://postgres:postgres@localhost:55432/postgres'
-METRICS_READ_SCHEMA = 'metrics'
+CELERY_BROKER = 'pyamqp://guest:guest@localhost:5682/data_pipeline'
+OUTPUT_CELERY_BROKER = 'pyamqp://guest:guest@localhost:5682/master_pipeline'
+OUTPUT_TASKNAME = 'adsmp.tasks.task_update_record'
 
-METRICS_WRITE_CONNECTION = 'postgresql://postgres:postgres@localhost:55432/postgres'
-METRICS_WRITE_SCHEMA = 'metricsstaging'
-
-NONBIB_READ_CONNECTION = 'postgresql://postgres:postgres@localhost:55432/postgres'
-NONBIB_READ_SCHEMA = 'nonbib'
-
-NONBIB_WRITE_CONNECTION = 'postgresql://postgres:postgres@localhost:55432/postgres'
-NONBIB_WRITE_SCHEMA = 'nonbibstaging'
-
-CELERY_BROKER = 'pyamqp://guest:guest@localhost:5672/etl'
-CELERY_INCLUDE = ['nonbibUpdater.tasks', 'metricsUpdater.tasks']
 
 
 
