@@ -96,6 +96,30 @@ def nonbib_delta_to_master_pipeline(schema):
         rec = NonBibRecord(**dict(row))
         logger.debug("Calling 'app.forward_message' with '%s'", str(rec))
         task_output_results.delay(rec)
+
+def diagnose():
+    """send hard coded nonbib data the master pipeline
+
+    useful for testing to verify connectivity"""
+
+    test_data = {'bibcode': '2003ASPC..295..361M', 'id': 6473150, 'authors': ["Mcdonald, S","Buddha, S"],
+                 'refereed': False, 'simbad_objects': [], 'grants': ['g'], 'citations': [], 'boost': 0.11,
+                 'citation_count': 0, 'read_count': 2, 'readers': ['a', 'b'],
+                 'downloads': [0,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,1,0,0,0,1,2],
+                 'reference': ['c', 'd'], 
+                 'reads': [0,0,0,0,0,0,0,0,1,0,4,2,5,1,0,0,1,0,0,2,4,5]}
+    # check readers!
+    rec = NonBibRecord(**test_data)
+    print 'sending nonbib data for bibocde', test_data['bibcode'], 'to master pipeline'
+    print 'using CELERY_BROKER', config['CELERY_BROKER']
+    print '  CELERY_DEFAULT_EXCHANGE', config['CELERY_DEFAULT_EXCHANGE']
+    print '  CELERY_DEFAULT_EXCHANGE_TYPE', config['CELERY_DEFAULT_EXCHANGE_TYPE']
+    print '  OUTPUT_CELERY_BROKER', config['OUTPUT_CELERY_BROKER']
+    print '  OUTPUT_TASKNAME', config['OUTPUT_TASKNAME']
+    print 'this action did not use ingest database (configured at', config['INGEST_DATABASE'], ')'
+    print '  or the metrics database (at', config['METRICS_DATABASE'], ')'
+    task_output_results.delay(rec)
+
     
 def main():
     parser = argparse.ArgumentParser(description='process column files into Postgres')
@@ -104,6 +128,7 @@ def main():
     parser.add_argument('-m', '--metricsSchemaName', default='metrics', help='name of the postgres metrics schema')
     parser.add_argument('-b', '--rowViewBaselineSchemaName', default='nonbibstaging', 
                         help='name of old postgres schema, used to compute delta')
+    parser.add_argument('-d', '--diagnose', default=False, action='store_true', help='run simple test')
     parser.add_argument('command', default='help', 
                         help='ingest | verify | createIngestTables | dropIngestTables | renameSchema ' \
                         + ' | createJoinedRows | ingestMeta | createMetricsTable | dropMetricsTable ' \
@@ -260,9 +285,12 @@ def main():
 
         m = metrics.Metrics(args.metricsSchemaName, {'FROM_SCRATCH': False, 'COPY_FROM_PROGRAM': False})
         m.update_metrics_changed(args.rowViewSchemaName)
+    elif args.command == 'nonbibToMasterPipeline' and args.diagnose:
+        diagnose()
     elif args.command == 'nonbibToMasterPipeline':
         nonbib_to_master_pipeline(args.rowViewSchemaName, 1)
     elif args.command == 'nonbibDeltaToMasterPipeline':
+        print 'diagnose = ', args.diagnose
         nonbib_delta_to_master_pipeline(args.rowViewSchemaName)
 
     else:
