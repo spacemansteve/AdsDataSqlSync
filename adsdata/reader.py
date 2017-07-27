@@ -2,8 +2,11 @@
 from adsputils import setup_logging, load_config
 
 
-
 class ADSClassicInputStream(object):
+    """file like object used to read nonbib column data files
+
+    provides a useful wrapper around python file object
+    """
 
     def __init__(self, file_):
         self._file = file_
@@ -39,6 +42,7 @@ class ADSClassicInputStream(object):
 
 
     def read(self, size=-1):
+        """called by iterators, use for column files where bibcodes are not repeated"""
         self.read_count += 1
         if self.read_count % 100000 == 0:
             self.logger.debug('nonbib file ingest, count = {}'.format(self.read_count))
@@ -51,6 +55,7 @@ class ADSClassicInputStream(object):
     
 
     def readline(self):
+        # consider changing to call read
         self.read_count += 1
         line = self._iostream.readline()
         return self.process_line(line)
@@ -74,6 +79,7 @@ class BibcodeFileReader(ADSClassicInputStream):
     
  
 class RefereedFileReader(ADSClassicInputStream):
+    """adds default True value for reading refereed column data file"""
     def __init__(self, file_):
         super(RefereedFileReader, self).__init__(file_)
         
@@ -83,22 +89,30 @@ class RefereedFileReader(ADSClassicInputStream):
         return row
         
 class StandardFileReader(ADSClassicInputStream):
-    """each line has all values for a single bibcode"""
+    """reads most nonbib column files
+
+    can read files where for a bibcode is on one line or on consecutive lines
+    """
     def __init__(self, file_type_, file_):
         super(StandardFileReader, self).__init__(file_)
         self.file_type = file_type_
         
         # the following lists controls how they are processed
+
         # as_array: should values be read in as an array and output to sql as an array
         #  for example, downloads and grants are an array while relevance has several distinct values but isn't an array
         self.array_types = ('download', 'reads', 'author', 'reference', 'grants', 'citation', 'reader', 'simbad', 'ned')
         # quote_value: should individual values sent to sql be in quotes.  
-        #  for example, we don't quote bibcode, but we do names of authors
+        #  for example, we don't quote reads, but we do names of authors
         self.quote_values = ('author','simbad','grants', 'ned')
-        # tab_separator: is the tab a separator in the input data
+        # tab_separator: is the tab a separator in the input data, default is comma
         self.tab_separated_values = ('author', 'download', 'reads')
         
     def read(self, size=-1):
+        """returns the data from the file for the next bibcode
+
+        peeks ahead in file and concatenates data if its bibcode matches
+        makes at least one and potentially multiple readline calls on iostream """
         self.read_count += 1
         if self.read_count % 100000 == 0:
             self.logger.debug('nonbib file ingest, processing {}, count = {}'.format(self.file_type, self.read_count))
@@ -122,8 +136,6 @@ class StandardFileReader(ADSClassicInputStream):
 
     def readline(self):
         return self.read()
-        #line = self._iostream.readline()
-        #return self.process_line(line)
 
         
     def process_line(self, bibcode, value):
