@@ -81,6 +81,21 @@ def nonbib_to_master_pipeline(schema, batch_size=1):
                 task_output_results.delay(recs)
             recs = []
 
+def nonbib_delta_to_master_pipeline(schema):
+    """send data for changed bibcodes to master pipeline
+
+    the delta talbe is computed by comparing to sets of nonbib data
+    perhaps ingested on succesive days"""
+    nonbib = row_view.SqlSync(schema)
+    connection = nonbib.engine.connect()
+    delta_table = nonbib.get_delta_table()
+    s = select([delta_table])
+    results = connection.execute(s)
+    for current_delta in results:
+        row = nonbib.get_row_view(current_delta['bibcode'])
+        rec = NonBibRecord(**dict(row))
+        logger.debug("Calling 'app.forward_message' with '%s'", str(rec))
+        task_output_results.delay(rec)
     
 def main():
     parser = argparse.ArgumentParser(description='process column files into Postgres')
@@ -95,7 +110,7 @@ def main():
                         + ' | populateMetricsTable | populateMetricsTableMeta | createDeltaRows | populateMetricsTableDelta ' \
                         + ' | runRowViewPipeline | runMetricsPipeline | createNewBibcodes ' \
                         + ' | runRowViewPipelineDelta | runMetricsPipelineDelta '\
-                        + ' | runPipelines | runPipelinesDelta | nonbibToMasterPipeline')
+                        + ' | runPipelines | runPipelinesDelta | nonbibToMasterPipeline | nonbibDeltaToMasterPipeline')
 
     args = parser.parse_args()
 
@@ -247,6 +262,8 @@ def main():
         m.update_metrics_changed(args.rowViewSchemaName)
     elif args.command == 'nonbibToMasterPipeline':
         nonbib_to_master_pipeline(args.rowViewSchemaName, 1)
+    elif args.command == 'nonbibDeltaToMasterPipeline':
+        nonbib_delta_to_master_pipeline(args.rowViewSchemaName)
 
     else:
         print 'app.py: illegal command or missing argument, command = ', args.command

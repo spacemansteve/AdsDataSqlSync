@@ -420,7 +420,7 @@ class SqlSync:
        natural left join {0}.Reference;' 
 
     create_changed_sql = \
-        'create materialized view {0}.ChangedRowsM as \
+        'create table {0}.ChangedRowsM as \
          select {0}.RowViewM.bibcode, {0}.RowViewM.id \
          from {0}.RowViewM,{1}.RowViewM \
          where {0}.RowViewM.bibcode={1}.RowViewM.bibcode  \
