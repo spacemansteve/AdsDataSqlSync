@@ -60,26 +60,19 @@ def load_metrics(m, row_view_schema):
     sess.commit()
     sess.close()
 
-def nonbib_to_master_pipeline(schema, batch_size=1):
+def nonbib_to_master_pipeline(schema):
     """send all nonbib data to queue for delivery to master pipeline"""
     nonbib = row_view.SqlSync(schema)
     connection = nonbib.engine.connect()
     s = select([nonbib.table])
     results = connection.execute(s)
-    recs = []
     for current_row in results:
         current_row = dict(current_row)
         logger.debug('Will forward this record: %s', current_row)
         rec = NonBibRecord(**current_row)
-        recs.append(rec)
-        if len(recs) >= batch_size:
-            if len(recs) == 1:
-                logger.debug("Calling 'app.forward_message' with '%s'", str(rec))
-                task_output_results.delay(rec)
-            else:
-                logger.debug("Calling 'app.forward_message' with '%s'", str(recs))
-                task_output_results.delay(recs)
-            recs = []
+        logger.debug("Calling 'app.forward_message' with '%s'", str(rec))
+        task_output_results.delay(rec)
+
 
 def nonbib_delta_to_master_pipeline(schema):
     """send data for changed bibcodes to master pipeline
@@ -288,7 +281,7 @@ def main():
     elif args.command == 'nonbibToMasterPipeline' and args.diagnose:
         diagnose()
     elif args.command == 'nonbibToMasterPipeline':
-        nonbib_to_master_pipeline(args.rowViewSchemaName, 1)
+        nonbib_to_master_pipeline(args.rowViewSchemaName)
     elif args.command == 'nonbibDeltaToMasterPipeline':
         print 'diagnose = ', args.diagnose
         nonbib_delta_to_master_pipeline(args.rowViewSchemaName)
