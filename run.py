@@ -15,6 +15,8 @@ from adsputils import load_config, setup_logging
 from adsmsg import NonBibRecord, NonBibRecordList, MetricsRecord, MetricsRecordList
 from adsdata.tasks import task_output_results, task_output_metrics
 
+from confluent_kafka import Producer
+
 logger = None
 config = {}
 # fields needed from nonbib to compute master record
@@ -28,7 +30,33 @@ nonbib_to_master_property_fields = ('ads_openaccess', 'author_openaccess', 'epri
                                     'nonarticle', 'ocrabstract', 'openaccess', 'private', 'pub_openaccess', 
                                     'refereed', 'toc')
 
-def load_column_files(config, nonbib_db_engine, nonbib_db_conn, sql_sync):
+
+def load_column_files(config):
+    for t in nonbib.NonBib.all_types:
+        #filename = config['DATA_PATH'] + config[t.upper()]
+        filename = '/Users/SpacemanSteve/tmp/data/columnFiles/current.20170706/bibcodes.list.can'
+        if t == 'canonical':
+            p = Producer({'bootstrap.servers': 'localhost:9092',
+                          'retries': 0,
+                          'batch.num.messages': 16384,
+                          'linger.ms': 1})
+            r = reader.BibcodeFileReader(filename)
+            line = r.readline()
+            c = 0
+            while len(line) >= 10:
+                # p.produce('test', key='20180815', value=line)
+                line = r.readline()
+                line = line.split()[0]
+                c += 1
+                if c % 10000 == 0:
+                    p.flush(1)
+                if c % 1000000 == 0:
+                    print '...{}, {}'.format(line, len(line))
+            p.flush(30)
+            print 'count {} lines to kafka topic'.format(c)
+
+
+def load_column_files_sql(config, nonbib_db_engine, nonbib_db_conn, sql_sync):
     """ use psycopg.copy_from to data from column file to postgres
     
     after data has been loaded, join to create a unified row view 
@@ -459,6 +487,9 @@ def main():
     args = parser.parse_args()
 
     config.update(load_config())
+    load_column_files(config)
+    if True:
+        return
 
     global logger
     logger = setup_logging('AdsDataSqlSync', config.get('LOG_LEVEL', 'INFO'))

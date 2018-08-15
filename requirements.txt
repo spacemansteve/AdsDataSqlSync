@@ -1,6 +1,8 @@
 git+https://github.com/adsabs/ADSPipelineUtils.git@v1.0.1
 alembic==0.9.1
 cachetools==1.1.5
+# sadly, requires "brew install librdkafka"
+confluent-kafka
 librabbitmq==1.6.1
 psycopg2==2.7.1
 python-Levenshtein==0.12.0
